@@ -6,6 +6,8 @@ import {
 import {
   AutomationRun,
   AutomationEvent,
+  ChannelCheckDetails,
+  AutomationTask,
 } from "../models/automationRun";
 import * as admin from "firebase-admin";
 import { getFirestore } from "../firebase/admin";
@@ -15,6 +17,8 @@ export class AutomationLogger {
   private errorsCount: number = 0;
   private jobsCreated: number = 0;
   private channelsProcessed: number = 0;
+  private channels: ChannelCheckDetails[] = [];
+  private tasks: AutomationTask[] = [];
 
   constructor(
     runId: string,
@@ -101,6 +105,8 @@ export class AutomationLogger {
         channelsProcessed: this.channelsProcessed,
         jobsCreated: this.jobsCreated,
         errorsCount: this.errorsCount,
+        channels: this.channels.length > 0 ? this.channels : undefined,
+        tasks: this.tasks.length > 0 ? this.tasks : undefined,
       });
     } catch (error: unknown) {
       const errorMessage =
@@ -137,6 +143,34 @@ export class AutomationLogger {
    */
   getErrorsCount(): number {
     return this.errorsCount;
+  }
+
+  /**
+   * Добавить информацию о проверке канала
+   */
+  addChannelCheck(channelCheck: ChannelCheckDetails): void {
+    this.channels.push(channelCheck);
+  }
+
+  /**
+   * Добавить созданную задачу
+   */
+  addTask(task: AutomationTask): void {
+    this.tasks.push(task);
+  }
+
+  /**
+   * Получить все проверки каналов
+   */
+  getChannels(): ChannelCheckDetails[] {
+    return this.channels;
+  }
+
+  /**
+   * Получить все задачи
+   */
+  getTasks(): AutomationTask[] {
+    return this.tasks;
   }
 }
 

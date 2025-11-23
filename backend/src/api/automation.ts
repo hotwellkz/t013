@@ -10,6 +10,7 @@ import {
   formatDateInTimezone,
 } from "../utils/automationSchedule";
 import { createAutomationLogger, AutomationLogger } from "../utils/automationLogger";
+import * as admin from "firebase-admin";
 
 const router = Router();
 
@@ -754,9 +755,54 @@ router.post("/run-scheduled", async (req: Request, res: Response) => {
         // Детальная проверка с логированием причин
         const checkResult = await shouldRunAutomation(channel, intervalMinutes);
         
+        // Определяем причину пропуска
+        let reason: "time_not_matched" | "day_not_allowed" | "task_already_exists" | "frequency_limit" | "disabled" | "already_running" | "ok" = "ok";
+        if (!checkResult.shouldRun) {
+          if (checkResult.reasons.includes("time_not_due")) {
+            reason = "time_not_matched";
+          } else if (checkResult.reasons.includes("day_not_allowed")) {
+            reason = "day_not_allowed";
+          } else if (checkResult.reasons.includes("max_active_jobs_reached")) {
+            reason = "frequency_limit";
+          } else if (checkResult.reasons.includes("already_running")) {
+            reason = "already_running";
+          } else if (checkResult.reasons.includes("automation_disabled_or_missing")) {
+            reason = "disabled";
+          }
+        }
+        
+        // Создаём детальный объект проверки канала
+        const channelCheck: import("../models/automationRun").ChannelCheckDetails = {
+          channelId: channel.id,
+          channelName: channel.name,
+          auto: channel.automation?.enabled === true,
+          shouldRunNow: checkResult.shouldRun,
+          reason,
+          details: {
+            now: Date.now(),
+            targetTime: checkResult.details?.matchingTimeDetails?.scheduledTime,
+            timeMatched: checkResult.details?.matchingTimeDetails !== undefined && !checkResult.details?.matchingTimeDetails?.alreadyRanToday,
+            dayMatched: checkResult.details?.currentDay && channel.automation?.daysOfWeek?.includes(checkResult.details.currentDay),
+            lastRunAt: channel.automation?.lastRunAt || null,
+            minutesSinceLastRun: channel.automation?.lastRunAt 
+              ? (Date.now() - channel.automation.lastRunAt) / (1000 * 60)
+              : undefined,
+            frequencyLimit: checkResult.details?.activeJobsCount >= checkResult.details?.maxActiveTasks,
+            activeJobsCount: checkResult.details?.activeJobsCount,
+            maxActiveTasks: checkResult.details?.maxActiveTasks,
+            timezone,
+            scheduledTimes: channel.automation?.times,
+            daysOfWeek: channel.automation?.daysOfWeek,
+          },
+        };
+        
+        // Сохраняем проверку канала в logger
+        logger.addChannelCheck(channelCheck);
+        
         console.log(`[Automation] Channel ${channel.id} (${channel.name}) check:`, {
           shouldRun: checkResult.shouldRun,
           reasons: checkResult.reasons,
+          reason,
           details: checkResult.details,
         });
         
@@ -782,10 +828,32 @@ router.post("/run-scheduled", async (req: Request, res: Response) => {
             console.log(
               `[Automation] ✅ Job created for channel ${channel.id}: ${jobId}`
             );
+            
+            // Сохраняем задачу в logger
+            const task: import("../models/automationRun").AutomationTask = {
+              taskId: jobId,
+              channelId: channel.id,
+              channelName: channel.name,
+              status: "pending",
+              error: null,
+              createdAt: admin.firestore.Timestamp.now(),
+            };
+            logger.addTask(task);
           } else {
             console.log(
               `[Automation] ⚠️ Job creation returned null for channel ${channel.id}`
             );
+            
+            // Сохраняем задачу с ошибкой
+            const task: import("../models/automationRun").AutomationTask = {
+              taskId: "failed",
+              channelId: channel.id,
+              channelName: channel.name,
+              status: "error",
+              error: "Job creation returned null",
+              createdAt: admin.firestore.Timestamp.now(),
+            };
+            logger.addTask(task);
           }
           
           results.push({

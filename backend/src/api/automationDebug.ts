@@ -161,5 +161,55 @@ router.get("/system", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/automation/debug/run-details?runId=XXXX
+ * Возвращает детальную информацию о запуске: каналы и задачи
+ */
+router.get("/run-details", async (req: Request, res: Response) => {
+  try {
+    const { runId } = req.query;
+    
+    if (!runId || typeof runId !== "string") {
+      return res.status(400).json({
+        error: "Требуется параметр runId",
+      });
+    }
+    
+    const { getAutomationRun, getAutomationEvents } = await import("../firebase/automationRunsService");
+    
+    const run = await getAutomationRun(runId);
+    if (!run) {
+      return res.status(404).json({
+        error: "Запуск не найден",
+      });
+    }
+    
+    // Получаем события для дополнительной информации
+    const events = await getAutomationEvents(runId, 100);
+    
+    res.json({
+      runId: run.id,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      status: run.status,
+      channelsPlanned: run.channelsPlanned,
+      channelsProcessed: run.channelsProcessed,
+      jobsCreated: run.jobsCreated,
+      errorsCount: run.errorsCount,
+      lastErrorMessage: run.lastErrorMessage,
+      timezone: run.timezone,
+      channels: run.channels || [],
+      tasks: run.tasks || [],
+      events: events,
+    });
+  } catch (error: any) {
+    console.error("[AutomationDebug] Error getting run details:", error);
+    res.status(500).json({
+      error: "Ошибка при получении деталей запуска",
+      message: error.message,
+    });
+  }
+});
+
 export default router;
 
