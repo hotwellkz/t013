@@ -798,6 +798,59 @@ router.post("/run-scheduled", async (req: Request, res: Response) => {
           console.log(
             `[Automation] ⏭️  Channel ${channel.id} (${channel.name}) skipped: ${checkResult.reasons.join(", ")}`
           );
+          
+          // Если канал пропущен из-за already_running, но прошло больше 30 минут с последнего запуска,
+          // сбрасываем флаг (защита от зависших флагов)
+          if (checkResult.reasons.includes("already_running")) {
+            const { updateChannel } = await import("../models/channel");
+            const channelData = await getChannelById(channel.id);
+            
+            if (channelData?.automation?.lastRunAt) {
+              const lastRunTime = channelData.automation.lastRunAt;
+              const now = Date.now();
+              const minutesSinceLastRun = (now - lastRunTime) / (1000 * 60);
+              
+              // Если прошло больше 30 минут, считаем что автоматизация зависла
+              if (minutesSinceLastRun > 30) {
+                try {
+                  await updateChannel(channel.id, {
+                    automation: {
+                      ...channelData.automation,
+                      isRunning: false,
+                      runId: null,
+                    },
+                  });
+                  console.log(
+                    `[Automation] ✅ Reset stuck isRunning flag for channel ${channel.id} (${minutesSinceLastRun.toFixed(1)} minutes since last run)`
+                  );
+                } catch (resetError) {
+                  console.error(
+                    `[Automation] ⚠️ Failed to reset stuck isRunning flag for channel ${channel.id}:`,
+                    resetError
+                  );
+                }
+              }
+            } else {
+              // Если lastRunAt отсутствует, но isRunning=true, сбрасываем флаг
+              try {
+                await updateChannel(channel.id, {
+                  automation: {
+                    ...channelData?.automation || channel.automation!,
+                    isRunning: false,
+                    runId: null,
+                  },
+                });
+                console.log(
+                  `[Automation] ✅ Reset isRunning flag for channel ${channel.id} (no lastRunAt)`
+                );
+              } catch (resetError) {
+                console.error(
+                  `[Automation] ⚠️ Failed to reset isRunning flag for channel ${channel.id}:`,
+                  resetError
+                );
+              }
+            }
+          }
         }
       } catch (error: any) {
         console.error(
