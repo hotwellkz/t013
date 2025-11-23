@@ -610,24 +610,52 @@ router.post("/channels/:channelId/run-now", async (req: Request, res: Response) 
     // Получаем канал
     const channel = await getChannelById(channelId);
     if (!channel) {
+      console.log(`[Automation] ❌ Channel ${channelId} not found`);
       return res.status(404).json({
         error: "Канал не найден",
       });
     }
     
+    console.log(`[Automation] Channel found: ${channel.id} (${channel.name})`);
+    console.log(`[Automation] Channel automation:`, JSON.stringify({
+      hasAutomation: !!channel.automation,
+      enabled: channel.automation?.enabled,
+      enabledType: typeof channel.automation?.enabled,
+      isRunning: channel.automation?.isRunning,
+      runId: channel.automation?.runId,
+    }, null, 2));
+    
+    // Нормализуем enabled (может быть строкой "true" из Firestore)
+    const automationEnabled = channel.automation?.enabled === true || channel.automation?.enabled === "true";
+    
     // Проверяем, включена ли автоматизация
-    if (!channel.automation || !channel.automation.enabled) {
+    if (!channel.automation || !automationEnabled) {
+      console.log(`[Automation] ❌ Automation not enabled for channel ${channelId}`);
+      console.log(`[Automation] automation exists: ${!!channel.automation}, enabled: ${channel.automation?.enabled}, normalized: ${automationEnabled}`);
       return res.status(400).json({
         error: "Автоматизация не включена для этого канала",
+        details: {
+          hasAutomation: !!channel.automation,
+          enabled: channel.automation?.enabled,
+          enabledType: typeof channel.automation?.enabled,
+        },
       });
     }
     
     // Проверяем, не выполняется ли уже автоматизация
     if (channel.automation.isRunning) {
+      console.log(`[Automation] ❌ Automation already running for channel ${channelId}`);
+      console.log(`[Automation] isRunning: ${channel.automation.isRunning}, runId: ${channel.automation.runId}`);
       return res.status(400).json({
         error: "Автоматизация уже выполняется для этого канала",
+        details: {
+          isRunning: channel.automation.isRunning,
+          runId: channel.automation.runId,
+        },
       });
     }
+    
+    console.log(`[Automation] ✅ All checks passed, starting automation for channel ${channelId}`);
     
     // Запускаем автоматизацию (игнорируя проверку времени/дней недели)
     let jobId: string | null = null;
