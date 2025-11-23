@@ -469,35 +469,6 @@ const VideoGeneration: React.FC = () => {
     }
   }
 
-  const handleSelectIdea = async (idea: Idea) => {
-    setSelectedIdea(idea)
-    setGeneratingPrompt(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const data = await apiFetchJson<{ veoPrompt: string; videoTitle: string }>('/api/prompts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channelId: selectedChannel!.id,
-          idea: {
-            title: idea.title,
-            description: idea.description,
-          },
-        }),
-      })
-      setVeoPrompt(data.veoPrompt)
-      setVideoTitle(data.videoTitle)
-      setStep(3)
-      setSuccess('Промпт и название сгенерированы!')
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setGeneratingPrompt(false)
-    }
-  }
-
   // Генерация видео напрямую из идеи (без промежуточных шагов)
   const handleGenerateVideoFromIdea = async (idea: Idea) => {
     if (!selectedChannel) {
