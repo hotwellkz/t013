@@ -246,14 +246,24 @@ export async function createAutomatedJob(
         });
       }
       
-      // Сбрасываем флаг isRunning
-      await updateChannel(channel.id, {
-        automation: {
-          ...channel.automation!,
-          isRunning: false,
-          runId: null,
-        },
-      });
+      // Сбрасываем флаг isRunning перед выходом
+      try {
+        await updateChannel(channel.id, {
+          automation: {
+            ...channel.automation!,
+            isRunning: false,
+            runId: null,
+          },
+        });
+        console.log(
+          `[Automation] ✅ Reset isRunning flag for channel ${channel.id} (max active jobs reached)`
+        );
+      } catch (resetError) {
+        console.error(
+          `[Automation] ⚠️ Failed to reset isRunning flag for channel ${channel.id}:`,
+          resetError
+        );
+      }
       return null;
     }
 
