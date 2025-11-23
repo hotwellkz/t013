@@ -952,5 +952,64 @@ router.post("/run-scheduled", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/automation/reset-running-flags
+ * Ручной сброс флагов isRunning для всех каналов (для разблокировки зависших каналов)
+ */
+router.post("/reset-running-flags", async (req: Request, res: Response) => {
+  try {
+    const channels = await getAllChannels();
+    const enabledChannels = channels.filter(
+      (ch) => ch.automation?.enabled === true && ch.automation?.isRunning === true
+    );
+    
+    console.log(`[Automation] Resetting isRunning flags for ${enabledChannels.length} channels`);
+    
+    const results: Array<{ channelId: string; channelName: string; success: boolean; error?: string }> = [];
+    
+    for (const channel of enabledChannels) {
+      try {
+        const { updateChannel } = await import("../models/channel");
+        await updateChannel(channel.id, {
+          automation: {
+            ...channel.automation!,
+            isRunning: false,
+            runId: null,
+          },
+        });
+        results.push({
+          channelId: channel.id,
+          channelName: channel.name,
+          success: true,
+        });
+        console.log(`[Automation] ✅ Reset isRunning flag for channel ${channel.id} (${channel.name})`);
+      } catch (error: any) {
+        results.push({
+          channelId: channel.id,
+          channelName: channel.name,
+          success: false,
+          error: error.message,
+        });
+        console.error(
+          `[Automation] ⚠️ Failed to reset isRunning flag for channel ${channel.id}:`,
+          error
+        );
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Сброшено флагов isRunning: ${results.filter(r => r.success).length} из ${results.length}`,
+      results,
+    });
+  } catch (error: any) {
+    console.error("[Automation] Error resetting running flags:", error);
+    res.status(500).json({
+      error: "Ошибка при сбросе флагов",
+      message: error.message,
+    });
+  }
+});
+
 export default router;
 
