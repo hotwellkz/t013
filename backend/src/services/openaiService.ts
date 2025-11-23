@@ -12,6 +12,8 @@ function getOpenAIClient(): OpenAI {
     }
     openai = new OpenAI({
       apiKey,
+      timeout: 60000, // 60 секунд таймаут
+      maxRetries: 2, // 2 попытки при ошибке
     });
   }
   return openai;
@@ -26,6 +28,12 @@ export interface Idea {
 export interface VeoPromptResult {
   veoPrompt: string;
   videoTitle: string;
+}
+
+export interface IdeaAndPromptResult {
+  ideaText: string; // Краткое описание идеи (title + description)
+  veoPrompt: string; // Промпт для Veo 3.1 Fast
+  videoTitle: string; // Название для YouTube
 }
 
 /**
@@ -333,6 +341,181 @@ export async function generateTitle(
       throw new Error(`Ошибка генерации названия: ${error.message}`);
     }
     throw new Error("Неизвестная ошибка при генерации названия");
+  }
+}
+
+/**
+ * Генерирует идею, Veo-промпт и название видео одним запросом (упрощённый пайплайн)
+ * @param channel - Канал с шаблонами промптов
+ * @returns Объект с ideaText, veoPrompt и videoTitle
+ */
+export async function generateIdeaAndPrompt(
+  channel: Channel
+): Promise<IdeaAndPromptResult> {
+  try {
+    console.log(`[OpenAI] 🚀 Generating idea + Veo prompt + title in one request for channel ${channel.id}`);
+    
+    // Формируем комбинированный промпт
+    let ideaPrompt = channel.ideaPromptTemplate;
+    ideaPrompt = ideaPrompt.replace(/{{DURATION}}/g, channel.durationSeconds.toString());
+    ideaPrompt = ideaPrompt.replace(/{{LANGUAGE}}/g, channel.language);
+    ideaPrompt = ideaPrompt.replace(/{{DESCRIPTION}}/g, channel.description);
+
+    // Определяем язык для промпта и названия
+    const langMap: Record<string, { prompt: string; title: string }> = {
+      ru: { prompt: "русском", title: "русском" },
+      kk: { prompt: "казахском", title: "казахском" },
+      en: { prompt: "английском", title: "английском" },
+    };
+    const langInfo = langMap[channel.language] || langMap.ru;
+    const promptLangName = langInfo.prompt;
+    const titleLangName = langInfo.title;
+
+    // Формируем шаблон для Veo-промпта (без подстановки идеи, так как идея будет сгенерирована)
+    let veoPromptTemplate = channel.videoPromptTemplate;
+    veoPromptTemplate = veoPromptTemplate.replace(/{{DURATION}}/g, channel.durationSeconds.toString());
+    veoPromptTemplate = veoPromptTemplate.replace(/{{LANGUAGE}}/g, channel.language);
+    // Убираем плейсхолдеры идеи, так как идея будет сгенерирована в этом же запросе
+    veoPromptTemplate = veoPromptTemplate.replace(/{{IDEA_TEXT}}/g, "[ИДЕЯ_БУДЕТ_ПОДСТАВЛЕНА]");
+    veoPromptTemplate = veoPromptTemplate.replace(/{{IDEA_TITLE}}/g, "[ЗАГОЛОВОК_ИДЕИ]");
+    veoPromptTemplate = veoPromptTemplate.replace(/{{IDEA_DESCRIPTION}}/g, "[ОПИСАНИЕ_ИДЕИ]");
+
+    // Формируем единый промпт для AI
+    const combinedPrompt = `Задача: сгенерировать идею для короткого видео (${channel.durationSeconds} секунд) и сразу создать промпт для Veo 3.1 Fast.
+
+Шаг 1 - Идея:
+${ideaPrompt}
+
+Шаг 2 - Veo-промпт:
+Используй следующую структуру для создания промпта:
+${veoPromptTemplate}
+
+Требования:
+- Идея должна быть креативной и подходить для короткого вертикального видео
+- Veo-промпт должен быть на ${promptLangName} языке и описывать визуальный сюжет для Veo 3.1 Fast
+- Название видео должно быть на ${titleLangName} языке, не длиннее 60 символов, без кавычек и эмодзи
+
+Верни ответ строго в формате JSON с полями:
+{
+  "idea_title": "краткий заголовок идеи",
+  "idea_description": "подробное описание идеи для видео",
+  "veo_prompt": "детальный промпт для Veo 3.1 Fast на ${promptLangName} языке",
+  "video_title": "название для YouTube на ${titleLangName} языке (макс 60 символов)"
+}`;
+
+    console.log(`[OpenAI] Combined prompt length: ${combinedPrompt.length} chars`);
+    console.log(`[OpenAI] Channel: ${channel.name}, Language: ${channel.language}, Duration: ${channel.durationSeconds}s`);
+
+    const client = getOpenAIClient();
+    const startTime = Date.now();
+    
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Ты помощник для генерации идей и промптов для коротких видео. Всегда возвращай ответ строго в формате JSON с полями idea_title, idea_description, veo_prompt, video_title.`,
+        },
+        {
+          role: "user",
+          content: combinedPrompt,
+        },
+      ],
+      temperature: 0.8,
+      max_tokens: 2000,
+      response_format: { type: "json_object" },
+    });
+
+    const duration = Date.now() - startTime;
+    console.log(`[OpenAI] ✅ Response received in ${duration}ms`);
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("OpenAI вернул пустой ответ");
+    }
+
+    console.log(`[OpenAI] Raw response length: ${content.length} chars`);
+    console.log(`[OpenAI] Raw response preview: ${content.substring(0, 300)}...`);
+
+    // Парсим JSON ответ
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      console.error("[OpenAI] ❌ JSON parse error:", parseError);
+      // Пытаемся извлечь JSON из текста
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          throw new Error(`Не удалось распарсить JSON ответ от OpenAI: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        }
+      } else {
+        throw new Error(`Не удалось распарсить JSON ответ от OpenAI: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
+    }
+
+    // Извлекаем данные
+    const ideaTitle = parsed.idea_title || parsed.ideaTitle || parsed.title || "";
+    const ideaDescription = parsed.idea_description || parsed.ideaDescription || parsed.description || "";
+    const veoPrompt = parsed.veo_prompt || parsed.veoPrompt || parsed.prompt || "";
+    let videoTitle = parsed.video_title || parsed.videoTitle || ideaTitle || "";
+
+    // Валидация
+    if (!ideaTitle || !ideaDescription) {
+      throw new Error("Не удалось получить идею из ответа OpenAI (отсутствуют idea_title или idea_description)");
+    }
+    if (!veoPrompt) {
+      throw new Error("Не удалось получить Veo-промпт из ответа OpenAI");
+    }
+
+    // Очищаем название от кавычек, эмодзи и лишних символов
+    videoTitle = videoTitle.trim();
+    videoTitle = videoTitle.replace(/^["'«»]|["'«»]$/g, "");
+    videoTitle = videoTitle.replace(/[#@]\w+/g, "");
+    videoTitle = videoTitle.replace(/[\u{1F300}-\u{1F9FF}]/gu, "");
+    
+    // Обрезаем до 60 символов
+    if (videoTitle.length > 60) {
+      videoTitle = videoTitle.substring(0, 60).trim();
+      const lastSpace = videoTitle.lastIndexOf(" ");
+      if (lastSpace > 40) {
+        videoTitle = videoTitle.substring(0, lastSpace);
+      }
+    }
+
+    // Если название пустое, используем заголовок идеи
+    if (!videoTitle) {
+      videoTitle = ideaTitle.substring(0, 60);
+    }
+
+    const ideaText = `${ideaTitle}: ${ideaDescription}`;
+
+    console.log(`[OpenAI] ✅ Generated:`);
+    console.log(`[OpenAI]    Idea: "${ideaTitle}"`);
+    console.log(`[OpenAI]    Veo prompt length: ${veoPrompt.length} chars`);
+    console.log(`[OpenAI]    Video title: "${videoTitle}"`);
+
+    return {
+      ideaText,
+      veoPrompt: veoPrompt.trim(),
+      videoTitle: videoTitle.trim(),
+    };
+  } catch (error: unknown) {
+    console.error("[OpenAI] ❌ Error in generateIdeaAndPrompt:", error);
+    if (error instanceof Error) {
+      // Проверяем на таймаут
+      if (error.message.includes("timeout") || error.message.includes("TIMEOUT")) {
+        throw new Error(`Таймаут при генерации идеи и промпта: ${error.message}`);
+      }
+      // Проверяем на проблемы с сетью
+      if (error.message.includes("ECONNREFUSED") || error.message.includes("ENOTFOUND")) {
+        throw new Error(`Проблема с подключением к OpenAI API: ${error.message}`);
+      }
+      throw new Error(`Ошибка генерации идеи и промпта: ${error.message}`);
+    }
+    throw new Error("Неизвестная ошибка при генерации идеи и промпта");
   }
 }
 

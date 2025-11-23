@@ -46,6 +46,9 @@ const ChannelSettings: React.FC = () => {
   const [success, setSuccess] = useState<string>('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const toast = useToast()
+  const [showLogs, setShowLogs] = useState(false)
+  const [channelLogs, setChannelLogs] = useState<any[]>([])
+  const [loadingLogs, setLoadingLogs] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -572,53 +575,55 @@ const ChannelSettings: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Кнопка ручного запуска */}
-                {!formData.automation.isRunning && editingId && (
-                  <div style={{ marginTop: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!editingId) return;
-                        setLoading(true);
-                        setError('');
-                        try {
-                          const result = await apiFetchJson<{ success: boolean; jobId: string; message: string }>(
-                            `/api/automation/channels/${editingId}/run-now`,
-                            { method: 'POST' }
-                          );
-                          setSuccess(result.message || 'Автоматизация запущена. Новые задачи появятся в истории генераций.');
-                          // Обновляем данные канала
-                          setTimeout(() => {
-                            fetchChannels();
-                            if (editingId) {
-                              const channel = channels.find(c => c.id === editingId);
-                              if (channel) {
-                                setFormData({
-                                  ...formData,
-                                  automation: channel.automation || formData.automation,
-                                });
+                {/* Кнопки управления */}
+                {editingId && (
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* Кнопка ручного запуска */}
+                    {!formData.automation.isRunning && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!editingId) return;
+                          setLoading(true);
+                          setError('');
+                          try {
+                            const result = await apiFetchJson<{ success: boolean; jobId: string; message: string }>(
+                              `/api/automation/channels/${editingId}/run-now`,
+                              { method: 'POST' }
+                            );
+                            setSuccess(result.message || 'Автоматизация запущена. Новые задачи появятся в истории генераций.');
+                            // Обновляем данные канала
+                            setTimeout(() => {
+                              fetchChannels();
+                              if (editingId) {
+                                const channel = channels.find(c => c.id === editingId);
+                                if (channel) {
+                                  setFormData({
+                                    ...formData,
+                                    automation: channel.automation || formData.automation,
+                                  });
+                                }
                               }
-                            }
-                          }, 1000);
-                        } catch (err) {
-                          setError(getErrorMessage(err));
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      disabled={loading || formData.automation.isRunning}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: loading || formData.automation.isRunning ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
+                            }, 1000);
+                          } catch (err) {
+                            setError(getErrorMessage(err));
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        disabled={loading || formData.automation.isRunning}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#4CAF50',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: loading || formData.automation.isRunning ? 'not-allowed' : 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
                       }}
                     >
                       <span>▶</span>

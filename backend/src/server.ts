@@ -27,8 +27,22 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: true, // Разрешаем все origins (для production можно указать конкретные)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400, // 24 часа
+}));
+app.use(express.json({ limit: '10mb' })); // Увеличиваем лимит для больших промптов
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Увеличиваем таймаут для всех запросов до 60 секунд (для AI запросов)
+app.use((req, res, next) => {
+  req.setTimeout(60000); // 60 секунд
+  res.setTimeout(60000);
+  next();
+});
 
 // Middleware для логирования запросов (для отладки)
 app.use((req, res, next) => {

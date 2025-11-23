@@ -1,8 +1,7 @@
 import { Router, Request, Response } from "express";
 import { getAllChannels, getChannelById, Channel, AutomationStatus } from "../models/channel";
 import { createJob, countActiveJobs } from "../models/videoJob";
-import { generateIdeas } from "../services/openaiService";
-import { generateVeoPrompt } from "../services/openaiService";
+import { generateIdeaAndPrompt } from "../services/openaiService";
 import {
   getCurrentTimeComponentsInTimezone,
   getDayOfWeekInTimezone,
@@ -314,13 +313,13 @@ export async function createAutomatedJob(
       return null;
     }
 
-    // Обновляем статус: running, шаг: генерация идеи
-    await updateChannelStatus(channel.id, "running", "Генерация идеи...", logger);
+    // Обновляем статус: running, шаг: генерация идеи и промпта
+    await updateChannelStatus(channel.id, "running", "Генерация идеи и Veo-промпта...", logger, "generate-idea-prompt");
 
-    // Шаг 1: Генерация одной идеи (упрощённый пайплайн)
-    let selectedIdea;
+    // Шаг 1: Генерация идеи, Veo-промпта и названия одним запросом (максимально упрощённый пайплайн)
+    let ideaAndPromptResult;
     try {
-      console.log(`[Automation] 📝 Step 1: Generating single idea for channel ${channel.id}`);
+      console.log(`[Automation] 📝 Step 1: Generating idea + Veo prompt + title in one request for channel ${channel.id}`);
       
       if (logger) {
         await logger.logEvent({
@@ -328,21 +327,17 @@ export async function createAutomatedJob(
           step: "generate-idea",
           channelId: channel.id,
           channelName: channel.name,
-          message: "Начинаю генерацию одной идеи",
+          message: "Начинаю генерацию идеи, Veo-промпта и названия одним запросом",
         });
       }
 
-      // Генерируем только одну идею (упрощение)
-      const ideas = await generateIdeas(channel, null, 1);
+      // Генерируем всё одним запросом
+      ideaAndPromptResult = await generateIdeaAndPrompt(channel);
       
-      if (!ideas || ideas.length === 0) {
-        throw new Error("Не удалось сгенерировать идею: OpenAI вернул пустой результат");
-      }
-
-      selectedIdea = ideas[0];
-      
-      console.log(`[Automation] ✅ Idea generated: "${selectedIdea.title}"`);
-      console.log(`[Automation]    Description: ${selectedIdea.description.substring(0, 100)}...`);
+      console.log(`[Automation] ✅ Idea + prompt + title generated in one request`);
+      console.log(`[Automation]    Idea: "${ideaAndPromptResult.ideaText.substring(0, 100)}..."`);
+      console.log(`[Automation]    Video title: "${ideaAndPromptResult.videoTitle}"`);
+      console.log(`[Automation]    Veo prompt length: ${ideaAndPromptResult.veoPrompt.length} chars`);
 
       if (logger) {
         await logger.logEvent({
@@ -350,98 +345,44 @@ export async function createAutomatedJob(
           step: "generate-idea",
           channelId: channel.id,
           channelName: channel.name,
-          message: `Идея сгенерирована: ${selectedIdea.title}`,
-          details: { ideaTitle: selectedIdea.title, ideaDescription: selectedIdea.description.substring(0, 200) },
-        });
-      }
-    } catch (error: any) {
-      const errorMsg = error?.message || String(error);
-      console.error(`[Automation] ❌ Error generating idea for channel ${channel.id}:`, errorMsg);
-      console.error(`[Automation] Error stack:`, error?.stack);
-      
-      await updateChannelStatus(
-        channel.id,
-        "error",
-        `Ошибка генерации идеи: ${errorMsg}`,
-        logger
-      );
-      
-      if (logger) {
-        await logger.logEvent({
-          level: "error",
-          step: "generate-idea",
-          channelId: channel.id,
-          channelName: channel.name,
-          message: "Ошибка генерации идеи",
-          details: { error: errorMsg, stack: error?.stack?.substring(0, 500) },
-        });
-      }
-      
-      throw error;
-    }
-
-    // Обновляем статус: шаг - генерация промпта
-    await updateChannelStatus(channel.id, "running", "Генерация Veo-промпта...", logger, "generate-prompt");
-
-    // Шаг 2: Генерация Veo-промпта
-    let veoPromptResult;
-    try {
-      console.log(`[Automation] 📝 Step 2: Generating Veo prompt for idea "${selectedIdea.title}"`);
-      
-      if (logger) {
-        await logger.logEvent({
-          level: "info",
-          step: "generate-prompt",
-          channelId: channel.id,
-          channelName: channel.name,
-          message: "Начинаю генерацию Veo-промпта",
-          details: { ideaTitle: selectedIdea.title },
-        });
-      }
-
-      veoPromptResult = await generateVeoPrompt(channel, {
-        title: selectedIdea.title,
-        description: selectedIdea.description,
-      });
-
-      console.log(`[Automation] ✅ Veo prompt generated`);
-      console.log(`[Automation]    Video title: "${veoPromptResult.videoTitle}"`);
-      console.log(`[Automation]    Prompt length: ${veoPromptResult.veoPrompt.length} chars`);
-      console.log(`[Automation]    Prompt preview: ${veoPromptResult.veoPrompt.substring(0, 150)}...`);
-
-      if (logger) {
-        await logger.logEvent({
-          level: "info",
-          step: "generate-prompt",
-          channelId: channel.id,
-          channelName: channel.name,
-          message: "Veo-промпт сгенерирован успешно",
+          message: `Идея, промпт и название сгенерированы успешно`,
           details: { 
-            videoTitle: veoPromptResult.videoTitle,
-            promptLength: veoPromptResult.veoPrompt.length,
+            ideaText: ideaAndPromptResult.ideaText.substring(0, 200),
+            videoTitle: ideaAndPromptResult.videoTitle,
+            promptLength: ideaAndPromptResult.veoPrompt.length,
           },
         });
       }
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      console.error(`[Automation] ❌ Error generating Veo prompt for channel ${channel.id}:`, errorMsg);
+      console.error(`[Automation] ❌ Error generating idea+prompt for channel ${channel.id}:`, errorMsg);
       console.error(`[Automation] Error stack:`, error?.stack);
+      
+      // Проверяем тип ошибки для более понятного сообщения
+      let userFriendlyError = errorMsg;
+      if (errorMsg.includes("timeout") || errorMsg.includes("TIMEOUT")) {
+        userFriendlyError = "Таймаут при обращении к AI. Попробуйте позже.";
+      } else if (errorMsg.includes("ECONNREFUSED") || errorMsg.includes("ENOTFOUND") || errorMsg.includes("CONNECTION")) {
+        userFriendlyError = "Проблема с подключением к AI сервису. Проверьте интернет-соединение.";
+      } else if (errorMsg.includes("API key") || errorMsg.includes("OPENAI_API_KEY")) {
+        userFriendlyError = "Ошибка конфигурации: не настроен API ключ OpenAI.";
+      }
       
       await updateChannelStatus(
         channel.id,
         "error",
-        `Ошибка генерации Veo-промпта: ${errorMsg}`,
+        `Ошибка генерации: ${userFriendlyError}`,
         logger,
-        "generate-prompt"
+        "generate-idea-prompt"
       );
       
       if (logger) {
         await logger.logEvent({
           level: "error",
-          step: "generate-prompt",
+          step: "generate-idea",
           channelId: channel.id,
           channelName: channel.name,
-          message: "Ошибка генерации Veo-промпта",
+          message: "Ошибка генерации идеи и промпта",
           details: { error: errorMsg, stack: error?.stack?.substring(0, 500) },
         });
       }
@@ -455,7 +396,7 @@ export async function createAutomatedJob(
     // Шаг 3: Создание задачи генерации видео
     let job;
     try {
-      console.log(`[Automation] 📝 Step 3: Creating video job with prompt for "${veoPromptResult.videoTitle}"`);
+      console.log(`[Automation] 📝 Step 3: Creating video job with prompt for "${ideaAndPromptResult.videoTitle}"`);
       
       if (logger) {
         await logger.logEvent({
@@ -464,17 +405,16 @@ export async function createAutomatedJob(
           channelId: channel.id,
           channelName: channel.name,
           message: "Создаю задачу генерации видео",
-          details: { videoTitle: veoPromptResult.videoTitle },
+          details: { videoTitle: ideaAndPromptResult.videoTitle },
         });
       }
 
-      const ideaText = `${selectedIdea.title}: ${selectedIdea.description}`;
       job = await createJob(
-        veoPromptResult.veoPrompt,
+        ideaAndPromptResult.veoPrompt,
         channel.id,
         channel.name,
-        ideaText,
-        veoPromptResult.videoTitle
+        ideaAndPromptResult.ideaText,
+        ideaAndPromptResult.videoTitle
       );
 
       console.log(`[Automation] ✅ Job created in Firestore: ${job.id}`);
@@ -498,8 +438,8 @@ export async function createAutomatedJob(
           details: { 
             jobId: job.id, 
             status: job.status,
-            videoTitle: veoPromptResult.videoTitle,
-            promptLength: veoPromptResult.veoPrompt.length,
+            videoTitle: ideaAndPromptResult.videoTitle,
+            promptLength: ideaAndPromptResult.veoPrompt.length,
           },
         });
       }
@@ -534,15 +474,15 @@ export async function createAutomatedJob(
     console.log("─".repeat(80));
     console.log(`[Automation] ✅ SUCCESS: Created automated job ${job.id} for channel ${channel.id}`);
     console.log(`[Automation] Duration: ${duration}ms`);
-    console.log(`[Automation] Idea: ${selectedIdea.title}`);
-    console.log(`[Automation] Video title: ${veoPromptResult.videoTitle}`);
+    console.log(`[Automation] Idea: ${ideaAndPromptResult.ideaText.substring(0, 100)}...`);
+    console.log(`[Automation] Video title: ${ideaAndPromptResult.videoTitle}`);
     console.log("─".repeat(80));
 
     // Обновляем статус на success
     await updateChannelStatus(
       channel.id,
       "success",
-      `Успешно создана задача ${job.id} для видео "${veoPromptResult.videoTitle}"`,
+      `Успешно создана задача ${job.id} для видео "${ideaAndPromptResult.videoTitle}"`,
       logger,
       undefined
     );

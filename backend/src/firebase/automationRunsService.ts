@@ -201,6 +201,41 @@ export async function getAutomationEvents(
 }
 
 /**
+ * Получить события для конкретного канала (последние N событий)
+ */
+export async function getAutomationEventsForChannel(
+  channelId: string,
+  limit: number = 20
+): Promise<AutomationEvent[]> {
+  try {
+    const db = getFirestore();
+    const snapshot = await db
+      .collection(EVENTS_COLLECTION)
+      .where("channelId", "==", channelId)
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get();
+
+    const events: AutomationEvent[] = [];
+    snapshot.forEach((doc) => {
+      events.push({
+        ...doc.data(),
+      } as AutomationEvent);
+    });
+
+    return events.reverse(); // Возвращаем в хронологическом порядке (старые -> новые)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[AutomationEvents] ❌ Error getting events for channel ${channelId}:`,
+      errorMessage
+    );
+    // Возвращаем пустой массив вместо ошибки, чтобы не ломать UI
+    return [];
+  }
+}
+
+/**
  * Получить последний успешный запуск
  */
 export async function getLastSuccessfulRun(): Promise<AutomationRun | null> {

@@ -351,5 +351,76 @@ router.get("/run-details", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/automation/debug/channel-logs?channelId=XXXX&limit=20
+ * Возвращает последние события автоматизации для конкретного канала
+ */
+router.get("/channel-logs", async (req: Request, res: Response) => {
+  try {
+    const { channelId, limit } = req.query;
+    
+    if (!channelId || typeof channelId !== "string") {
+      return res.status(400).json({
+        error: "Требуется параметр channelId",
+      });
+    }
+    
+    const limitNum = parseInt(limit as string) || 20;
+    
+    console.log(`[AutomationDebug] Getting logs for channel ${channelId}, limit: ${limitNum}`);
+    
+    const { getAutomationEventsForChannel } = await import("../firebase/automationRunsService");
+    const events = await getAutomationEventsForChannel(channelId, limitNum);
+    
+    // Конвертируем Timestamp в ISO строки
+    const eventsDTO = events.map((event: any) => {
+      try {
+        let createdAt: string | null = null;
+        if (event.createdAt) {
+          if (event.createdAt.toDate && typeof event.createdAt.toDate === 'function') {
+            createdAt = event.createdAt.toDate().toISOString();
+          } else if (event.createdAt.seconds) {
+            createdAt = new Date(event.createdAt.seconds * 1000).toISOString();
+          } else if (typeof event.createdAt === 'number') {
+            createdAt = new Date(event.createdAt).toISOString();
+          }
+        }
+        
+        return {
+          id: event.id || null,
+          runId: event.runId || null,
+          createdAt: createdAt,
+          level: event.level || 'info',
+          step: event.step || 'other',
+          channelId: event.channelId || null,
+          channelName: event.channelName || null,
+          message: event.message || '',
+          details: event.details || null,
+        };
+      } catch (eventErr: any) {
+        console.warn(`[AutomationDebug] Error processing event:`, eventErr);
+        return {
+          id: null,
+          error: 'Error processing event data',
+        };
+      }
+    });
+    
+    console.log(`[AutomationDebug] ✅ Returning ${eventsDTO.length} events for channel ${channelId}`);
+    
+    res.json({
+      channelId,
+      events: eventsDTO,
+      count: eventsDTO.length,
+    });
+  } catch (error: any) {
+    console.error("[AutomationDebug] ❌ Error getting channel logs:", error);
+    res.status(500).json({
+      error: "Ошибка при получении логов канала",
+      message: error.message || String(error),
+    });
+  }
+});
+
 export default router;
 
