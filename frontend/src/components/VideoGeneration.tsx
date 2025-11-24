@@ -6,6 +6,7 @@ import MobileActionsBar from './MobileActionsBar'
 import { useToast } from '../hooks/useToast'
 import { ToastContainer } from './Toast'
 import { VideoJobsList } from './VideoJobsList'
+import { useWizard } from '../contexts/WizardContext'
 
 type Language = 'ru' | 'kk' | 'en'
 
@@ -150,11 +151,10 @@ const NotificationSettingsCollapsible: React.FC<{ notifications: ReturnType<type
 }
 
 const VideoGeneration: React.FC = () => {
-  const [step, setStep] = useState<Step>(1)
+  const { step, setStep, selectedChannel, setSelectedChannel } = useWizard()
   const [channels, setChannels] = useState<Channel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string>('')
-  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null)
   const [theme, setTheme] = useState<string>('')
   const [ideas, setIdeas] = useState<Idea[]>([])
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null)
@@ -201,8 +201,6 @@ const VideoGeneration: React.FC = () => {
   const [isChannelDescriptionExpanded, setIsChannelDescriptionExpanded] = useState(false)
   const [rejectingJobId, setRejectingJobId] = useState<string | null>(null) // ID задачи, которая сейчас отклоняется
   const [approvingJobId, setApprovingJobId] = useState<string | null>(null) // ID задачи, которая сейчас одобряется
-  const [isStepperSticky, setIsStepperSticky] = useState(false)
-  const stepperWrapperRef = useRef<HTMLDivElement>(null)
   
   // Состояния для модалки голосового ввода
   // Теперь используем MediaRecorder + OpenAI Whisper на backend вместо браузерного SpeechRecognition
@@ -340,28 +338,6 @@ const VideoGeneration: React.FC = () => {
       setIsPromptCollapsed(true)
     }
   }, [step])
-
-  // Отслеживание sticky состояния stepper'а
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!stepperWrapperRef.current) return
-      
-      const rect = stepperWrapperRef.current.getBoundingClientRect()
-      // Проверяем, когда stepper достиг верхней границы (с учётом хедера)
-      const isSticky = rect.top <= 64 // Высота хедера
-      setIsStepperSticky(isSticky)
-    }
-
-    // Проверяем только на мобильных устройствах
-    if (window.innerWidth <= 768) {
-      window.addEventListener('scroll', handleScroll, { passive: true })
-      handleScroll() // Проверяем сразу
-
-      return () => {
-        window.removeEventListener('scroll', handleScroll)
-      }
-    }
-  }, [])
 
   // Автоскрытие toast о создании задачи через 5 секунд
   useEffect(() => {
@@ -1230,36 +1206,6 @@ const VideoGeneration: React.FC = () => {
       
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
-
-      {/* Прогресс-индикатор шагов */}
-      <div 
-        ref={stepperWrapperRef}
-        className={`wizard-steps-wrapper ${isStepperSticky ? 'is-sticky' : ''}`}
-      >
-        <div className="steps-progress">
-          <div 
-            className={`steps-progress__step ${step === 1 ? 'active' : ''}`}
-            onClick={() => setStep(1)}
-          >
-            <div className="steps-progress__number">1</div>
-            <span className="steps-progress__label">Выбор канала</span>
-          </div>
-          <div 
-            className={`steps-progress__step ${step === 2 ? 'active' : ''} ${selectedChannel ? 'steps-progress__step--clickable' : 'steps-progress__step--disabled'}`}
-            onClick={() => selectedChannel && setStep(2)}
-          >
-            <div className="steps-progress__number">2</div>
-            <span className="steps-progress__label">Генерация идей</span>
-          </div>
-          <div 
-            className={`steps-progress__step ${step === 3 ? 'active' : ''} ${selectedChannel ? 'steps-progress__step--clickable' : 'steps-progress__step--disabled'}`}
-            onClick={() => selectedChannel && setStep(3)}
-          >
-            <div className="steps-progress__number">3</div>
-            <span className="steps-progress__label">Промпт + генерация</span>
-          </div>
-        </div>
-      </div>
 
       {/* Шаг 1: Выбор канала */}
       {step === 1 && (

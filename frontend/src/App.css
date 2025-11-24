@@ -46,6 +46,201 @@
   overflow-x: hidden !important;
   margin: 0 !important;
   position: relative;
+  transition: padding 0.3s ease, box-shadow 0.3s ease;
+}
+
+.app-header--condensed {
+  padding: 0.75rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.app-header--condensed h1,
+.app-header--condensed .tabs {
+  display: none;
+}
+
+/* Новый компонент WizardSteps - компактные шаги в шапке */
+.wizard-steps {
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.wizard-steps--condensed {
+  margin-top: 0;
+}
+
+.wizard-steps__channel {
+  font-size: 0.75rem;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wizard-steps__container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.wizard-steps__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 9999px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px;
+  box-sizing: border-box;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wizard-steps__step:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.wizard-steps__step:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.wizard-steps__step--active {
+  background: white;
+  color: #667eea;
+  border-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+
+.wizard-steps__step--completed {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.wizard-steps__step--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.wizard-steps__number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.wizard-steps__step--active .wizard-steps__number {
+  background: #667eea;
+  color: white;
+}
+
+.wizard-steps__step--completed .wizard-steps__number {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.wizard-steps__label {
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.wizard-steps__step--active .wizard-steps__label {
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* Мобильная версия для WizardSteps */
+@media (max-width: 768px) {
+  .wizard-steps {
+    margin-top: 0.75rem;
+  }
+
+  .wizard-steps--condensed {
+    margin-top: 0;
+  }
+
+  .wizard-steps__container {
+    gap: 0.375rem;
+    padding: 0 0.5rem;
+  }
+
+  .wizard-steps__step {
+    padding: 0.375rem 0.5rem;
+    min-width: 50px;
+    gap: 0.2rem;
+  }
+
+  .wizard-steps__number {
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+  }
+
+  .wizard-steps__label {
+    font-size: 0.65rem;
+  }
+
+  .wizard-steps__channel {
+    font-size: 0.7rem;
+    margin-bottom: 0.375rem;
+    padding: 0 0.5rem;
+  }
+
+  .app-header--condensed {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .app-header--condensed .wizard-steps {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .wizard-steps__step {
+    padding: 0.3rem 0.4rem;
+    min-width: 45px;
+  }
+
+  .wizard-steps__number {
+    width: 18px;
+    height: 18px;
+    font-size: 0.7rem;
+  }
+
+  .wizard-steps__label {
+    font-size: 0.6rem;
+  }
+
+  .wizard-steps__container {
+    gap: 0.25rem;
+  }
 }
 
 .app-header h1 {

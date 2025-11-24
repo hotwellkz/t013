@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
+import { WizardProvider } from './contexts/WizardContext'
 
 // Устанавливаем конфигурацию Firebase для service worker
 if ('serviceWorker' in navigator) {
@@ -17,10 +18,14 @@ if ('serviceWorker' in navigator) {
   }
 }
 
+import { WizardProvider } from './contexts/WizardContext'
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <WizardProvider>
+        <App />
+      </WizardProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )
