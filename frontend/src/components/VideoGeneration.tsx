@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import '../App.css'
 import { apiFetch, apiFetchJson, ApiError, resolveApiUrl } from '../lib/apiClient'
 import { useNotifications } from '../hooks/useNotifications'
