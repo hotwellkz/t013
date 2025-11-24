@@ -22,11 +22,13 @@
 
 .app {
   min-height: 100vh;
+  height: auto;
   display: flex;
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden !important;
+  overflow-x: hidden;
+  overflow-y: auto;
   width: 100% !important;
   max-width: 100% !important;
   position: relative;
@@ -43,17 +45,17 @@
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  overflow-x: hidden !important;
+  overflow: visible;
   margin: 0 !important;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
   transition: padding 0.3s ease, box-shadow 0.3s ease;
+  flex-shrink: 0;
 }
 
 .app-header--condensed {
   padding: 0.75rem 1rem;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -291,8 +293,11 @@
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box !important;
-  overflow-x: hidden !important;
+  overflow-x: hidden;
+  overflow-y: visible;
   position: relative;
+  height: auto;
+  min-height: calc(100vh - 200px);
 }
 
 .card {
@@ -304,9 +309,9 @@
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  overflow-x: hidden !important;
-  overflow-y: visible !important; /* Разрешаем sticky для дочерних элементов */
+  overflow: visible;
   position: relative;
+  height: auto;
 }
 
 .card h2 {
@@ -574,28 +579,13 @@
   overflow-x: hidden;
 }
 
-/* Прогресс-индикатор шагов */
-/* Обёртка для stepper с поддержкой sticky */
+/* Прогресс-индикатор шагов - старый (скрыт, используется новый WizardSteps в шапке) */
 .wizard-steps-wrapper {
-  margin-bottom: 1.5rem;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
+  display: none;
 }
 
 .steps-progress {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0;
-  padding: 1rem;
-  background: #f7fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
+  display: none;
 }
 
 .steps-progress__step {
@@ -914,9 +904,12 @@
 
 @media (max-width: 768px) {
   .app {
-    overflow-x: hidden !important;
+    overflow-x: hidden;
+    overflow-y: auto;
     width: 100% !important;
     max-width: 100% !important;
+    height: auto;
+    min-height: 100vh;
   }
 
   /* Показываем мобильную панель действий */
@@ -939,7 +932,12 @@
   }
 
   .app-main {
-    padding-bottom: 0; /* Убираем глобальный отступ */
+    padding: 1rem;
+    padding-bottom: 88px; /* Отступ для нижней панели */
+    overflow-y: visible;
+    overflow-x: hidden;
+    height: auto;
+    min-height: calc(100vh - 200px);
   }
 
   /* Минималистичная шапка */
@@ -948,8 +946,11 @@
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-    overflow-x: hidden !important;
+    overflow: visible;
     margin: 0 !important;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
   }
 
   .app-header h1 {
@@ -989,10 +990,14 @@
   }
   .app-main {
     padding: 1rem;
+    padding-bottom: 88px;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-    overflow-x: hidden !important;
+    overflow-x: hidden;
+    overflow-y: visible;
+    height: auto;
+    min-height: calc(100vh - 250px);
   }
   /* Минималистичные карточки */
   .card {
@@ -1002,8 +1007,9 @@
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-    overflow-x: hidden !important;
+    overflow: visible;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    height: auto;
   }
 
   .card h2 {
@@ -2149,35 +2155,13 @@
     margin: 0;
   }
 
-  /* Липкий stepper на мобильных */
+  /* Убираем старые стили wizard-steps-wrapper */
   .wizard-steps-wrapper {
-    position: sticky;
-    top: 64px; /* Высота хедера */
-    z-index: 950;
-    background: #f7f8ff;
-    padding: 8px 12px 6px;
-    margin-bottom: 1rem;
-    margin-left: -1rem;
-    margin-right: -1rem;
-    margin-top: -1rem;
-    transition: box-shadow 0.2s ease;
-  }
-
-  .wizard-steps-wrapper.is-sticky {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  }
-
-  .wizard-steps-wrapper .steps-progress {
-    padding: 0.75rem 0.5rem;
-    margin-bottom: 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
+    display: none;
   }
 
   .steps-progress {
-    padding: 0.75rem;
-    margin-bottom: 1rem;
+    display: none;
   }
 
   .steps-progress__number {
