@@ -1780,8 +1780,8 @@ const VideoGeneration: React.FC = () => {
             Канал: {selectedChannel.name}
           </div>
 
-          {/* Кнопки копирования (на мобильном в одной строке) */}
-          <div className="step-3-copy-buttons">
+          {/* Кнопки копирования (на десктопе) */}
+          <div className="step-3-copy-buttons step-3-copy-buttons-desktop">
             <button
               type="button"
               className="button button-secondary step-3-copy-button"
@@ -1802,9 +1802,9 @@ const VideoGeneration: React.FC = () => {
             </button>
           </div>
 
-          {/* Основная кнопка генерации */}
+          {/* Основная кнопка генерации (на десктопе) */}
           <button
-            className="button step-3-generate-button"
+            className="button step-3-generate-button step-3-generate-button-desktop"
             onClick={handleGenerateVideo}
             disabled={loading || !veoPrompt.trim() || activeJobsCount >= maxActiveJobs}
           >
@@ -1926,6 +1926,44 @@ const VideoGeneration: React.FC = () => {
             approvingJobId={approvingJobId}
             showChannelName={false}
           />
+
+          {/* Липкое нижнее меню для мобильных */}
+          <div className="step-3-sticky-footer">
+            <div className="step-3-sticky-footer__container">
+              <button
+                type="button"
+                className="step-3-sticky-footer__button step-3-sticky-footer__button--secondary"
+                onClick={handleCopyPrompt}
+                disabled={!veoPrompt.trim()}
+                title="Скопировать промпт"
+              >
+                <span className="step-3-sticky-footer__icon">📋</span>
+                <span className="step-3-sticky-footer__text">Промпт</span>
+              </button>
+              <button
+                type="button"
+                className="step-3-sticky-footer__button step-3-sticky-footer__button--secondary"
+                onClick={handleCopyTitle}
+                disabled={!videoTitle.trim()}
+                title="Скопировать название"
+              >
+                <span className="step-3-sticky-footer__icon">📋</span>
+                <span className="step-3-sticky-footer__text">Название</span>
+              </button>
+              <button
+                className="step-3-sticky-footer__button step-3-sticky-footer__button--primary"
+                onClick={handleGenerateVideo}
+                disabled={loading || !veoPrompt.trim() || activeJobsCount >= maxActiveJobs}
+              >
+                <span className="step-3-sticky-footer__icon">
+                  {loading ? '⏳' : '🎬'}
+                </span>
+                <span className="step-3-sticky-footer__text">
+                  {loading ? 'Создание...' : 'Сгенерировать'}
+                </span>
+              </button>
+            </div>
+          </div>
 
         </div>
       )}
