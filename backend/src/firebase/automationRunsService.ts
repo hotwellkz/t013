@@ -57,13 +57,28 @@ export async function updateAutomationRun(
     // Удаляем id из updates, если он там есть
     const { id: _, ...updateData } = updates as any;
 
-    // Firestore не поддерживает undefined, конвертируем в null
-    const cleanedData: any = {};
-    for (const [key, value] of Object.entries(updateData)) {
-      if (value !== undefined) {
-        cleanedData[key] = value;
+    // Рекурсивная функция для удаления undefined значений из объектов
+    const removeUndefined = (obj: any): any => {
+      if (obj === null || obj === undefined) {
+        return null;
       }
-    }
+      if (Array.isArray(obj)) {
+        return obj.map(removeUndefined);
+      }
+      if (typeof obj === 'object') {
+        const cleaned: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined) {
+            cleaned[key] = removeUndefined(value);
+          }
+        }
+        return cleaned;
+      }
+      return obj;
+    };
+
+    // Firestore не поддерживает undefined, удаляем их рекурсивно
+    const cleanedData = removeUndefined(updateData);
 
     if (Object.keys(cleanedData).length > 0) {
       await runRef.update(cleanedData);

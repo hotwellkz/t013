@@ -11,6 +11,7 @@ import titleRouter from "./api/title";
 import fcmRouter from "./api/fcm";
 import automationRouter from "./api/automation";
 import automationDebugRouter from "./api/automationDebug";
+import mcpRouter from "./api/mcp";
 import { getTelegramClient } from "./telegram/client";
 import { initializeFirebase } from "./firebase/admin";
 import * as cron from "node-cron";
@@ -72,6 +73,63 @@ app.use("/api/generate-title", titleRouter);
 app.use("/api/fcm", fcmRouter);
 app.use("/api/automation", automationRouter);
 app.use("/api/automation/debug", automationDebugRouter);
+app.use("/mcp", mcpRouter);
+
+// SSE endpoint для MCP (должен быть на корневом уровне /sse)
+app.get("/sse", (req: express.Request, res: express.Response) => {
+  console.log("[MCP] SSE connection requested at /sse");
+  
+  // Устанавливаем заголовки для SSE
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
+
+  // Отправляем начальное сообщение
+  const sendSSE = (data: any) => {
+    const jsonData = JSON.stringify(data);
+    res.write(`data: ${jsonData}\n\n`);
+  };
+
+  // Отправляем приветственное сообщение
+  sendSSE({
+    jsonrpc: "2.0",
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: {
+        tools: {},
+        resources: {},
+        prompts: {},
+      },
+      serverInfo: {
+        name: "whitecoding-backend",
+        version: "1.0.0",
+      },
+    },
+  });
+
+  // Обработка закрытия соединения
+  req.on("close", () => {
+    console.log("[MCP] SSE connection closed");
+    res.end();
+  });
+
+  // Периодически отправляем heartbeat для поддержания соединения
+  const heartbeatInterval = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(": heartbeat\n\n");
+    } else {
+      clearInterval(heartbeatInterval);
+    }
+  }, 30000); // каждые 30 секунд
+
+  // Очистка при закрытии
+  req.on("close", () => {
+    clearInterval(heartbeatInterval);
+  });
+});
 
 // Health check
 app.get("/health", (req, res) => {

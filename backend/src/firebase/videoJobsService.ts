@@ -205,11 +205,33 @@ export async function getAllJobs(channelId?: string): Promise<VideoJob[]> {
 
 /**
  * Получить активные задачи (в процессе генерации)
+ * Исключает задачи, которые зависли слишком долго (более 2 часов без обновления)
  */
 export async function getActiveJobs(channelId?: string): Promise<VideoJob[]> {
   const activeStatuses: VideoJobStatus[] = ["queued", "sending", "waiting_video", "downloading", "uploading"];
   const jobs = await getAllJobs(channelId);
-  return jobs.filter(job => activeStatuses.includes(job.status));
+  const now = Date.now();
+  const MAX_ACTIVE_AGE_MS = 2 * 60 * 60 * 1000; // 2 часа
+  
+  return jobs.filter(job => {
+    // Проверяем, что статус активный
+    if (!activeStatuses.includes(job.status)) {
+      return false;
+    }
+    
+    // Проверяем, не зависла ли задача (не обновлялась более 2 часов)
+    const lastUpdate = job.updatedAt || job.createdAt;
+    const age = now - lastUpdate;
+    
+    if (age > MAX_ACTIVE_AGE_MS) {
+      console.log(
+        `[VideoJobs] Job ${job.id} (${job.status}) is too old (${Math.round(age / 1000 / 60)} minutes), excluding from active count`
+      );
+      return false;
+    }
+    
+    return true;
+  });
 }
 
 /**

@@ -151,14 +151,59 @@ async function shouldRunAutomation(
       .map(Number);
 
     const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute;
-    const diffMinutes = currentTotalMinutes - scheduledTotalMinutes;
+    
+    // Вычисляем разницу с учетом перехода через полночь
+    let diffMinutes: number;
+    let isYesterdayTime = false;
+    
+    if (scheduledTotalMinutes > currentTotalMinutes) {
+      // Время было вчера (например, 22:44, а сейчас 02:20)
+      // Вычисляем разницу: (24*60 - scheduled) + current
+      diffMinutes = (24 * 60 - scheduledTotalMinutes) + currentTotalMinutes;
+      isYesterdayTime = true;
+    } else {
+      // Время было сегодня
+      diffMinutes = currentTotalMinutes - scheduledTotalMinutes;
+    }
 
-    // Проверяем, что время уже наступило и в пределах интервала (коридор после запланированного времени)
-    // Scheduler запускается каждые 5 минут, поэтому нужен коридор после запланированного времени
-    // diffMinutes >= 0 означает, что запланированное время уже прошло
-    // diffMinutes <= intervalMinutes означает, что мы ещё в пределах допустимого интервала
-    if (diffMinutes >= 0 && diffMinutes <= intervalMinutes) {
-      // Проверяем, не было ли уже запуска сегодня для этого времени
+    // Проверяем, что время уже наступило и в пределах интервала
+    // Для времени вчера: если мы в новом дне и прошло меньше 6 часов с полуночи, проверяем запуск
+    // (это позволяет запустить пропущенный запуск в начале нового дня)
+    // Для времени сегодня: проверяем в интервале intervalMinutes
+    const isTimeInWindow = isYesterdayTime 
+      ? diffMinutes >= 0 && diffMinutes <= (6 * 60) // Для вчерашнего времени даем окно 6 часов после полуночи
+      : diffMinutes >= 0 && diffMinutes <= intervalMinutes; // Для сегодняшнего времени - стандартный интервал
+    
+    if (isTimeInWindow) {
+      // Определяем, для какого дня проверяем запуск
+      let targetDay: { year: number; month: number; day: number };
+      
+      if (isYesterdayTime) {
+        // Время было вчера, проверяем запуск для вчерашнего дня
+        const yesterdayDate = new Date(currentTimeUTC);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterdayFormatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        });
+        const yesterdayParts = yesterdayFormatter.formatToParts(yesterdayDate);
+        targetDay = {
+          year: parseInt(yesterdayParts.find((p) => p.type === "year")!.value),
+          month: parseInt(yesterdayParts.find((p) => p.type === "month")!.value) - 1,
+          day: parseInt(yesterdayParts.find((p) => p.type === "day")!.value),
+        };
+      } else {
+        // Время сегодня
+        targetDay = {
+          year: currentTimeComponents.year,
+          month: currentTimeComponents.month,
+          day: currentTimeComponents.day,
+        };
+      }
+
+      // Проверяем, не было ли уже запуска для этого времени
       let alreadyRanToday = false;
       
       if (automation.lastRunAt) {
@@ -179,11 +224,11 @@ async function shouldRunAutomation(
         const lastRunHour = parseInt(lastRunParts.find((p) => p.type === "hour")!.value);
         const lastRunMinute = parseInt(lastRunParts.find((p) => p.type === "minute")!.value);
 
-        // Если последний запуск был сегодня и для этого же времени - пропускаем
+        // Если последний запуск был в тот же день и для этого же времени - пропускаем
         if (
-          lastRunYear === currentTimeComponents.year &&
-          lastRunMonth === currentTimeComponents.month &&
-          lastRunDay === currentTimeComponents.day &&
+          lastRunYear === targetDay.year &&
+          lastRunMonth === targetDay.month &&
+          lastRunDay === targetDay.day &&
           lastRunHour === scheduledHour &&
           lastRunMinute === scheduledMinute
         ) {
@@ -193,17 +238,21 @@ async function shouldRunAutomation(
             diffMinutes,
             alreadyRanToday: true,
             lastRunAt: automation.lastRunAt,
+            targetDay,
+            isYesterdayTime,
           };
           continue;
         }
       }
 
-      // Нашли подходящее время, которое ещё не запускалось сегодня
+      // Нашли подходящее время, которое ещё не запускалось
       foundMatchingTime = true;
       matchingTimeDetails = {
         scheduledTime,
         diffMinutes,
         alreadyRanToday: false,
+        targetDay,
+        isYesterdayTime,
       };
       break;
     }
@@ -942,28 +991,37 @@ router.post("/run-scheduled", async (req: Request, res: Response) => {
         }
         
         // Создаём детальный объект проверки канала
+        // Удаляем undefined значения, чтобы избежать ошибок Firestore
+        const details: any = {
+          now: Date.now(),
+          timeMatched: checkResult.details?.matchingTimeDetails !== undefined && !checkResult.details?.matchingTimeDetails?.alreadyRanToday,
+          dayMatched: checkResult.details?.currentDay && channel.automation?.daysOfWeek?.includes(checkResult.details.currentDay),
+          lastRunAt: channel.automation?.lastRunAt || null,
+          frequencyLimit: checkResult.details?.activeJobsCount >= checkResult.details?.maxActiveTasks,
+          activeJobsCount: checkResult.details?.activeJobsCount,
+          maxActiveTasks: checkResult.details?.maxActiveTasks,
+          timezone,
+          scheduledTimes: channel.automation?.times,
+          daysOfWeek: channel.automation?.daysOfWeek,
+        };
+        
+        // Добавляем targetTime только если он определен
+        if (checkResult.details?.matchingTimeDetails?.scheduledTime !== undefined) {
+          details.targetTime = checkResult.details.matchingTimeDetails.scheduledTime;
+        }
+        
+        // Добавляем minutesSinceLastRun только если он определен
+        if (channel.automation?.lastRunAt) {
+          details.minutesSinceLastRun = (Date.now() - channel.automation.lastRunAt) / (1000 * 60);
+        }
+        
         const channelCheck: import("../models/automationRun").ChannelCheckDetails = {
           channelId: channel.id,
           channelName: channel.name,
           auto: channel.automation?.enabled === true,
           shouldRunNow: checkResult.shouldRun,
           reason,
-          details: {
-            now: Date.now(),
-            targetTime: checkResult.details?.matchingTimeDetails?.scheduledTime,
-            timeMatched: checkResult.details?.matchingTimeDetails !== undefined && !checkResult.details?.matchingTimeDetails?.alreadyRanToday,
-            dayMatched: checkResult.details?.currentDay && channel.automation?.daysOfWeek?.includes(checkResult.details.currentDay),
-            lastRunAt: channel.automation?.lastRunAt || null,
-            minutesSinceLastRun: channel.automation?.lastRunAt 
-              ? (Date.now() - channel.automation.lastRunAt) / (1000 * 60)
-              : undefined,
-            frequencyLimit: checkResult.details?.activeJobsCount >= checkResult.details?.maxActiveTasks,
-            activeJobsCount: checkResult.details?.activeJobsCount,
-            maxActiveTasks: checkResult.details?.maxActiveTasks,
-            timezone,
-            scheduledTimes: channel.automation?.times,
-            daysOfWeek: channel.automation?.daysOfWeek,
-          },
+          details,
         };
         
         // Сохраняем проверку канала в logger
@@ -1364,4 +1422,5 @@ router.post("/stop-channel", async (req: Request, res: Response) => {
 });
 
 export default router;
+
 

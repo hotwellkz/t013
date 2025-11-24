@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import '../App.css'
 import { apiFetch, apiFetchJson, ApiError, resolveApiUrl } from '../lib/apiClient'
 import { useNotifications } from '../hooks/useNotifications'
+import MobileActionsBar from './MobileActionsBar'
 import { useToast } from '../hooks/useToast'
 import { ToastContainer } from './Toast'
 import { VideoJobsList } from './VideoJobsList'
@@ -1927,43 +1928,16 @@ const VideoGeneration: React.FC = () => {
             showChannelName={false}
           />
 
-          {/* Липкое нижнее меню для мобильных */}
-          <div className="step-3-sticky-footer">
-            <div className="step-3-sticky-footer__container">
-              <button
-                type="button"
-                className="step-3-sticky-footer__button step-3-sticky-footer__button--secondary"
-                onClick={handleCopyPrompt}
-                disabled={!veoPrompt.trim()}
-                title="Скопировать промпт"
-              >
-                <span className="step-3-sticky-footer__icon">📋</span>
-                <span className="step-3-sticky-footer__text">Промпт</span>
-              </button>
-              <button
-                type="button"
-                className="step-3-sticky-footer__button step-3-sticky-footer__button--secondary"
-                onClick={handleCopyTitle}
-                disabled={!videoTitle.trim()}
-                title="Скопировать название"
-              >
-                <span className="step-3-sticky-footer__icon">📋</span>
-                <span className="step-3-sticky-footer__text">Название</span>
-              </button>
-              <button
-                className="step-3-sticky-footer__button step-3-sticky-footer__button--primary"
-                onClick={handleGenerateVideo}
-                disabled={loading || !veoPrompt.trim() || activeJobsCount >= maxActiveJobs}
-              >
-                <span className="step-3-sticky-footer__icon">
-                  {loading ? '⏳' : '🎬'}
-                </span>
-                <span className="step-3-sticky-footer__text">
-                  {loading ? 'Создание...' : 'Сгенерировать'}
-                </span>
-              </button>
-            </div>
-          </div>
+          {/* Новая мобильная панель действий */}
+          <MobileActionsBar
+            onCopyPrompt={handleCopyPrompt}
+            onCopyTitle={handleCopyTitle}
+            onGenerate={handleGenerateVideo}
+            promptDisabled={!veoPrompt.trim()}
+            titleDisabled={!videoTitle.trim()}
+            generateDisabled={loading || !veoPrompt.trim() || activeJobsCount >= maxActiveJobs}
+            loading={loading}
+          />
 
         </div>
       )}
