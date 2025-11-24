@@ -1751,7 +1751,7 @@ const VideoGeneration: React.FC = () => {
             {
               id: 'voice-idea',
               icon: '🎤',
-              text: 'Своя идея',
+              text: 'Предложить свою идею',
               onClick: handleStartVoiceInput,
               disabled: generatingIdeas || generatingPrompt,
               variant: 'secondary'
@@ -1759,7 +1759,7 @@ const VideoGeneration: React.FC = () => {
             {
               id: 'generate-ideas',
               icon: '✨',
-              text: 'Генерировать',
+              text: 'Сгенерировать идеи',
               onClick: handleGenerateIdeas,
               disabled: generatingIdeas || generatingPrompt,
               variant: 'primary',
@@ -1768,7 +1768,7 @@ const VideoGeneration: React.FC = () => {
             {
               id: 'custom-prompt',
               icon: '📝',
-              text: 'Промпт',
+              text: 'Вставить готовый промпт',
               onClick: () => {
                 console.log('[customPrompt] open modal from mobile bar')
                 setShowCustomPromptModal(true)
@@ -2000,16 +2000,16 @@ const VideoGeneration: React.FC = () => {
           buttons={[
             {
               id: 'copy-prompt',
-              icon: '📋',
-              text: 'Промпт',
+              icon: '📄',
+              text: 'Показать промпт',
               onClick: handleCopyPrompt,
               disabled: !veoPrompt.trim(),
               variant: 'secondary'
             },
             {
               id: 'copy-title',
-              icon: '📋',
-              text: 'Название',
+              icon: '🏷️',
+              text: 'Показать название',
               onClick: handleCopyTitle,
               disabled: !videoTitle.trim(),
               variant: 'secondary'

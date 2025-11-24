@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 interface ActionButton {
   id: string
   icon: string
-  text: string
+  text: string // Используется для tooltip (title)
   onClick: () => void
   disabled?: boolean
   variant?: 'primary' | 'secondary'
@@ -48,13 +48,11 @@ const MobileActionsBar: React.FC<MobileActionsBarProps> = ({
               e.stopPropagation()
             }}
             disabled={button.disabled}
+            title={button.text}
             aria-label={button.text}
           >
             <span className="mobile-actions-bar__icon">
               {button.loading ? '⏳' : button.icon}
-            </span>
-            <span className="mobile-actions-bar__text">
-              {button.loading ? 'Загрузка...' : button.text}
             </span>
           </button>
         ))}
