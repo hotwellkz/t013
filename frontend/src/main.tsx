@@ -18,8 +18,6 @@ if ('serviceWorker' in navigator) {
   }
 }
 
-import { WizardProvider } from './contexts/WizardContext'
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>

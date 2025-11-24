@@ -67,8 +67,6 @@ interface VideoJob {
   webContentLink?: string
 }
 
-type Step = 1 | 2 | 3
-
 // Компонент для collapsible настроек уведомлений
 const NotificationSettingsCollapsible: React.FC<{ notifications: ReturnType<typeof useNotifications> }> = ({ notifications }) => {
   const [isOpen, setIsOpen] = useState(false)
