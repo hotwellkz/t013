@@ -19,13 +19,48 @@ router.get("/runs", async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const runs = await getRecentAutomationRuns(limit);
 
+    const toIsoString = (value: any): string | null => {
+      if (!value) {
+        return null;
+      }
+
+      try {
+        if (typeof value.toDate === "function") {
+          return value.toDate().toISOString();
+        }
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        if (typeof value === "number") {
+          return new Date(value).toISOString();
+        }
+        if (typeof value === "string") {
+          const parsed = new Date(value);
+          return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+        }
+        if (
+          typeof value === "object" &&
+          value.seconds !== undefined &&
+          value.nanoseconds !== undefined
+        ) {
+          return new Date(
+            value.seconds * 1000 + value.nanoseconds / 1000000
+          ).toISOString();
+        }
+      } catch (conversionError) {
+        console.warn("[AutomationDebug] Failed to convert timestamp:", conversionError);
+      }
+
+      return null;
+    };
+
     // Конвертируем Timestamp в ISO строки для JSON
     const runsDTO = runs.map((run) => ({
       id: run.id,
-      startedAt: run.startedAt.toDate().toISOString(),
-      finishedAt: run.finishedAt?.toDate().toISOString() || null,
+      startedAt: toIsoString(run.startedAt),
+      finishedAt: toIsoString(run.finishedAt),
       status: run.status,
-      schedulerInvocationAt: run.schedulerInvocationAt?.toDate().toISOString() || null,
+      schedulerInvocationAt: toIsoString(run.schedulerInvocationAt),
       channelsPlanned: run.channelsPlanned,
       channelsProcessed: run.channelsProcessed,
       jobsCreated: run.jobsCreated,

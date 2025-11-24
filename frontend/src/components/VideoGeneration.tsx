@@ -216,6 +216,7 @@ const VideoGeneration: React.FC = () => {
   // Состояния для модалки "Вставить готовый промпт"
   const [showCustomPromptModal, setShowCustomPromptModal] = useState(false)
   const [customPromptText, setCustomPromptText] = useState<string>('')
+  const [customPromptError, setCustomPromptError] = useState<string>('')
 
   // Polling для обновления статусов задач
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -816,8 +817,11 @@ const VideoGeneration: React.FC = () => {
     }
   }
 
-  const handleGenerateVideo = async () => {
-    if (!veoPrompt.trim()) {
+  const generateVideo = async (promptOverride?: string) => {
+    const promptSource = promptOverride !== undefined ? promptOverride : veoPrompt
+    const trimmedPrompt = promptSource.trim()
+
+    if (!trimmedPrompt) {
       setError('Введите промпт для генерации видео')
       return
     }
@@ -856,7 +860,7 @@ const VideoGeneration: React.FC = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: veoPrompt.trim(),
+            prompt: trimmedPrompt,
             channelName: selectedChannel.name,
             language: selectedChannel.language,
           }),
@@ -882,7 +886,7 @@ const VideoGeneration: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: veoPrompt.trim(),
+          prompt: trimmedPrompt,
           channelId: selectedChannel.id,
           channelName: selectedChannel.name,
           ideaText: selectedIdea ? `${selectedIdea.title}. ${selectedIdea.description}` : undefined,
@@ -891,7 +895,6 @@ const VideoGeneration: React.FC = () => {
       })
       console.log('[VideoJob] Created job:', data.jobId)
       
-      const trimmedPrompt = veoPrompt.trim()
       const newJobTitle =
         (finalTitle && finalTitle.trim()) ||
         (trimmedPrompt ? `${trimmedPrompt.substring(0, 60)}${trimmedPrompt.length > 60 ? '...' : ''}` : undefined)
@@ -924,6 +927,34 @@ const VideoGeneration: React.FC = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleGenerateVideo = async () => {
+    await generateVideo()
+  }
+
+  const handleCustomPromptGenerate = async () => {
+    const trimmedPrompt = customPromptText.trim()
+
+    if (!trimmedPrompt) {
+      setCustomPromptError('Введите промпт!')
+      return
+    }
+
+    if (!selectedChannel) {
+      setError('Выберите канал')
+      return
+    }
+
+    setCustomPromptError('')
+    setVeoPrompt(trimmedPrompt)
+    setVideoTitle('')
+    setSelectedIdea(null)
+    setShowCustomPromptModal(false)
+    setCustomPromptText('')
+    setStep(3)
+
+    await generateVideo(trimmedPrompt)
   }
 
   const handleApproveJob = async (jobId: string, jobTitle?: string) => {
@@ -1600,6 +1631,7 @@ const VideoGeneration: React.FC = () => {
             if (e.target === e.currentTarget) {
               setShowCustomPromptModal(false)
               setCustomPromptText('')
+              setCustomPromptError('')
             }
           }}
         >
@@ -1623,12 +1655,23 @@ const VideoGeneration: React.FC = () => {
               <label>Промпт для Veo 3.1 Fast</label>
               <textarea
                 value={customPromptText}
-                onChange={(e) => setCustomPromptText(e.target.value)}
+                onChange={(e) => {
+                  setCustomPromptText(e.target.value)
+                  if (customPromptError) {
+                    setCustomPromptError('')
+                  }
+                }}
                 placeholder="Вставьте ваш промпт для Veo..."
                 rows={8}
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
               />
             </div>
+
+            {customPromptError && (
+              <div className="error" style={{ marginTop: '1rem' }}>
+                {customPromptError}
+              </div>
+            )}
 
             <div style={{ 
               display: 'flex', 
@@ -1642,29 +1685,18 @@ const VideoGeneration: React.FC = () => {
                 onClick={() => {
                   setShowCustomPromptModal(false)
                   setCustomPromptText('')
+                  setCustomPromptError('')
                 }}
               >
                 Отмена
               </button>
               <button
                 className="button"
-                onClick={() => {
-                  if (!customPromptText.trim()) return
-                  
-                  console.log('[customPrompt] confirm and go to step 3')
-                  console.log('[customPrompt] prompt length:', customPromptText.trim().length)
-                  
-                  // Устанавливаем промпт и переходим на шаг 3
-                  setVeoPrompt(customPromptText.trim())
-                  setVideoTitle('') // Очищаем название, пользователь может ввести своё на шаге 3
-                  setShowCustomPromptModal(false)
-                  setCustomPromptText('')
-                  setStep(3)
-                  setSuccess('Промпт вставлен. Можете отредактировать его при необходимости.')
-                }}
-                disabled={!customPromptText.trim()}
+                onClick={handleCustomPromptGenerate}
+                disabled={loading}
+                style={{ fontWeight: 600 }}
               >
-                Продолжить к генерации
+                <strong>Сгенерировать видео</strong>
               </button>
             </div>
           </div>
