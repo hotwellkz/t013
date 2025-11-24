@@ -110,6 +110,7 @@
   max-width: 100% !important;
   box-sizing: border-box !important;
   overflow-x: hidden !important;
+  overflow-y: visible !important; /* Разрешаем sticky для дочерних элементов */
   position: relative;
 }
 
@@ -379,11 +380,19 @@
 }
 
 /* Прогресс-индикатор шагов */
+/* Обёртка для stepper с поддержкой sticky */
+.wizard-steps-wrapper {
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .steps-progress {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   padding: 1rem;
   background: #f7fafc;
   border-radius: 12px;
@@ -1678,21 +1687,28 @@
 }
 
 .notification-settings-collapsible__content {
-  padding: 0.75rem 1rem;
+  padding: 12px 16px;
   border-top: 1px solid #e2e8f0;
+  background: #f7fafc;
+  border-radius: 0 0 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 10px;
   animation: slideDown 0.2s ease-out;
+  height: auto;
+  min-height: auto;
+  max-height: none;
 }
 
 .notification-settings-collapsible__checkbox {
   display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
   font-size: 0.9rem;
   line-height: 1.5;
+  padding: 0;
+  margin: 0;
 }
 
 .notification-settings-collapsible__checkbox input {
@@ -1938,6 +1954,32 @@
     margin: 0;
   }
 
+  /* Липкий stepper на мобильных */
+  .wizard-steps-wrapper {
+    position: sticky;
+    top: 64px; /* Высота хедера */
+    z-index: 950;
+    background: #f7f8ff;
+    padding: 8px 12px 6px;
+    margin-bottom: 1rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-top: -1rem;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .wizard-steps-wrapper.is-sticky {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .wizard-steps-wrapper .steps-progress {
+    padding: 0.75rem 0.5rem;
+    margin-bottom: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+
   .steps-progress {
     padding: 0.75rem;
     margin-bottom: 1rem;
@@ -1988,14 +2030,44 @@
     padding-bottom: 80px;
   }
 
+  .notification-settings-collapsible {
+    margin-top: 1rem;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: visible;
+  }
+
   .notification-settings-collapsible__header {
     font-size: 0.9rem;
     padding: 0.625rem 0.875rem;
   }
 
   .notification-settings-collapsible__content {
-    padding: 0.625rem 0.875rem;
+    padding: 12px 16px;
     font-size: 0.85rem;
+    background: #f7fafc;
+    border-radius: 0 0 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible;
+  }
+
+  .notification-settings-collapsible__checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .notification-settings-collapsible__checkbox input {
+    margin-top: 0;
+    flex-shrink: 0;
   }
 }
 
